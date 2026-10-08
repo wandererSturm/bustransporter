@@ -31,6 +31,22 @@ def test_invalid_session_is_rejected(conn, source, target, port):
         sessions.create_session(conn, 1, 1, source, target, port)
 
 
+def test_session_becomes_disconnected_when_target_is_lost(conn):
+    """Regression test for BT-15."""
+    session_id = sessions.create_session(conn, 1, 1, "10.0.0.5", "192.168.1.20", 5000)
+    assert sessions.check_connection(conn, session_id, lambda ip, port: True) == "active"
+    assert sessions.check_connection(conn, session_id, lambda ip, port: False) == "disconnected"
+    session = sessions.get_session(conn, session_id)
+    assert session["status"] == "disconnected"
+    assert session["ended_at"] is not None
+
+
+def test_closed_session_is_not_reopened_by_heartbeat(conn):
+    session_id = sessions.create_session(conn, 1, 1, "10.0.0.5", "192.168.1.20", 5000)
+    sessions.close_session(conn, session_id)
+    assert sessions.check_connection(conn, session_id, lambda ip, port: False) == "closed"
+
+
 def test_closed_session(conn):
     session_id = sessions.create_session(conn, 1, 1, "10.0.0.5", "192.168.1.20", 5000)
     sessions.close_session(conn, session_id)

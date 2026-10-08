@@ -1,6 +1,10 @@
 """Transfer sessions between a source and a target IP address."""
 import ipaddress
 
+from bustransporter import log
+
+logger = log.get_logger("sessions")
+
 
 class SessionError(ValueError):
     pass
@@ -30,6 +34,23 @@ def create_session(conn, user_id, config_id, source_ip, target_ip, port):
 def close_session(conn, session_id):
     conn.execute("UPDATE transfer_sessions SET status = 'closed', ended_at = CURRENT_TIMESTAMP WHERE id = ?",
                  (session_id,))
+
+
+def check_connection(conn, session_id, is_alive):
+    """Heartbeat: mark an active session as disconnected when the target no longer answers.
+
+    `is_alive(target_ip, port)` returns True while the remote side is reachable.
+    """
+    session = get_session(conn, session_id)
+    if session is None or session["status"] != "active":
+        return session and session["status"]
+    if is_alive(session["target_ip"], session["port"]):
+        return "active"
+    conn.execute("UPDATE transfer_sessions SET status = 'disconnected', ended_at = CURRENT_TIMESTAMP WHERE id = ?",
+                 (session_id,))
+    logger.warning("Връзката към %s:%s е прекъсната", session["target_ip"], session["port"],
+                   extra={"session_id": session_id, "event": "disconnected"})
+    return "disconnected"
 
 
 def get_session(conn, session_id):
