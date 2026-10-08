@@ -4,12 +4,17 @@ from datetime import datetime
 DIRECTIONS = {"in": "<-", "out": "->"}
 
 
+def _unsigned(data):
+    # Some bus drivers deliver bytes as signed values (-128..127); 0xFF arrives as -1.
+    return [b & 0xFF for b in data]
+
+
 def to_hex(data):
-    return " ".join(f"{b:02X}" for b in data)
+    return " ".join(f"{b:02X}" for b in _unsigned(data))
 
 
 def to_ascii(data):
-    return "".join(chr(b) if 32 <= b < 127 else "." for b in data)
+    return "".join(chr(b) if 32 <= b < 127 else "." for b in _unsigned(data))
 
 
 def format_packet(direction, data, timestamp=None, mode="hex"):
